@@ -167,14 +167,10 @@ No teste de <strong>falha de pagamento</strong> (Etapa 4), o mesmo raciocínio a
 Ambos os testes seguem o padrão <strong>Arrange, Act, Assert</strong>, sinalizado por comentários, com um cenário por bloco <code>it</code>. A suíte cobre os três cenários propostos — <strong>falha</strong> de pagamento (retorno <code>null</code>), <strong>desconto</strong> de 10% (cobrança de R$ 180) e <strong>envio de e-mail</strong> (interação verificada). Rodando <code>npm test</code>, os dois testes passam.
 </p>
 
-<pre>PASS __tests__/CheckoutService.test.js
-  CheckoutService
-    quando o pagamento falha
-      ✓ deve retornar null (pedido não é criado)
-    quando um cliente Premium finaliza a compra
-      ✓ deve aplicar 10% de desconto e notificar o cliente por e-mail
-
-Tests: 2 passed, 2 total</pre>
+<figure style="margin: 1em 0; text-align: center;">
+<img src="npmTeste.png" alt="Saída do npm test: 1 suíte e 2 testes passando" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px;" />
+<figcaption style="font-size: 0.85em; color: #666; margin-top: 0.4em;">Saída do <code>npm test</code>: 1 suíte e 2 testes aprovados.</figcaption>
+</figure>
 
 <!-- ===================== 4. CONCLUSÃO ===================== -->
 <h2>4. Conclusão</h2>
