@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Relatório — Implementando Padrões de Teste (Test Patterns)</title>
+<style>
+  @page { size: A4; margin: 22mm 20mm; }
+  html { font-size: 11pt; }
+  body { font-family: "Calibri", "Segoe UI", Arial, sans-serif; color:#111; line-height:1.45; max-width: 175mm; margin: 0 auto; }
+  h1, h2, h3 { color:#1a3a6c; margin-top: 1.4em; }
+  h1 { font-size: 1.55rem; }
+  h2 { font-size: 1.15rem; border-bottom: 1px solid #cfd8e3; padding-bottom: 2px; }
+  h3 { font-size: 1.0rem; margin-bottom: .2em; }
+  p, li { text-align: justify; }
+  code, pre { font-family: Consolas, "Courier New", monospace; }
+  pre { background:#f4f6fa; border:1px solid #d8dee9; padding:8px 10px; border-radius:6px; font-size: 9.5pt; overflow-x:auto; }
+  .cover { text-align:center; padding-top: 60mm; page-break-after: always; }
+  .cover h1 { font-size: 1.8rem; margin-bottom: .2em; }
+  .cover .meta { margin-top: 60mm; line-height: 2; font-size: 1.05rem; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 14px; font-size: 10pt; }
+  th, td { border: 1px solid #c7d0db; padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background:#eaf0f8; }
+  figure { margin: 10px 0; text-align:center; page-break-inside: avoid; }
+  figure img { max-width: 100%; border:1px solid #d8dee9; border-radius:4px; }
+  figcaption { font-size: 9.5pt; color:#555; margin-top: 4px; }
+  .callout { background:#fff7e6; border-left:4px solid #f0ad4e; padding:8px 12px; border-radius:4px; margin: 10px 0; }
+  .two-col { display:flex; gap:12px; }
+  .two-col > div { flex:1; min-width:0; }
+  .two-col h4 { margin: 0 0 4px; font-size: 10pt; color:#1a3a6c; }
+</style>
+</head>
+<body>
+
+<!-- ===================== CAPA ===================== -->
+<section class="cover">
+  <h1>Implementando Padrões de Teste (Test Patterns)</h1>
+  <div class="meta">
+    <div><strong>Disciplina:</strong> Teste de Software</div>
+    <div><strong>Aluna:</strong> Roberta Sophia Silva</div>
+    <div><strong>Matrícula:</strong> 839631</div>
+    <div><strong>Data:</strong> 28/05/2026</div>
+  </div>
+</section>
+
+<!-- ===================== 1. INTRODUÇÃO ===================== -->
+<h2>1. Introdução</h2>
+
+<p>
+Este trabalho parte de um serviço de <em>checkout</em> de e-commerce já implementado (o <em>SUT — System Under Test</em>) para o qual faltava a suíte de testes. O objetivo foi construir testes limpos <strong>desde o início</strong>, aplicando padrões de teste para resolver dois problemas recorrentes: <strong>(a)</strong> a criação de dados de teste de forma legível e flexível (padrões <em>Object Mother</em> e <em>Data Builder</em>) e <strong>(b)</strong> o isolamento das dependências externas — gateway de pagamento, repositório e envio de e-mail — por meio de <em>Test Doubles</em> (<em>Stubs</em> e <em>Mocks</em>). O código entregue está em <code>__tests__/builders/UserMother.js</code>, <code>__tests__/builders/CarrinhoBuilder.js</code> e <code>__tests__/CheckoutService.test.js</code>.
+</p>
+
+<!-- ===================== 2. PADRÕES DE CRIAÇÃO DE DADOS ===================== -->
+<h2>2. Padrões de Criação de Dados (Builders)</h2>
+
+<h3>2.1 Por que <code>CarrinhoBuilder</code> e não <code>CarrinhoMother</code>?</h3>
+<p>
+O padrão <em>Object Mother</em> é ideal para entidades <strong>simples e estáveis</strong>, que variam pouco entre os testes — exatamente o caso do <code>User</code>. Por isso o <code>UserMother</code> expõe apenas métodos fixos: <code>umUsuarioPadrao()</code> e <code>umUsuarioPremium()</code>. Já o <code>Carrinho</code> é um objeto <strong>complexo e combinatório</strong>: pode ter diferentes usuários, um ou vários itens, valores distintos ou estar vazio. Modelar isso com um <em>Object Mother</em> levaria a uma <strong>explosão de métodos</strong> (<code>umCarrinhoPremiumComDoisItens()</code>, <code>umCarrinhoVazioDeUsuarioComum()</code>, e assim por diante), cada combinação exigindo um novo método.
+</p>
+<p>
+O <em>Data Builder</em> resolve isso oferecendo um <strong>estado padrão válido</strong> e métodos fluentes que customizam <strong>apenas o que importa</strong> em cada cenário. Em vez de N métodos para N combinações, temos poucos métodos componíveis (<code>.comUser()</code>, <code>.comItens()</code>, <code>.comItem()</code>, <code>.vazio()</code>) que se encadeiam livremente.
+</p>
+
+<h3>2.2 Antes × Depois</h3>
+<p>
+A diferença fica clara comparando o setup manual de um carrinho premium de R$ 200,00 com o mesmo setup usando o <em>Data Builder</em>:
+</p>
+
+<div class="two-col">
+  <div>
+    <h4>Antes (setup manual)</h4>
+<pre>// monta tudo "na mão", expondo
+// detalhes irrelevantes ao cenário
+const user = new User(
+  2, 'Usuário Premium',
+  'premium@email.com', 'PREMIUM');
+
+const itens = [
+  new Item('Produto A', 150),
+  new Item('Produto B', 50),
+];
+
+const carrinho = new Carrinho(user, itens);
+// ... e repetir isso em cada teste</pre>
+  </div>
+  <div>
+    <h4>Depois (Data Builder)</h4>
+<pre>// declara só o que importa:
+// é premium e soma R$ 200,00
+const carrinho = new CarrinhoBuilder()
+  .comUser(UserMother.umUsuarioPremium())
+  .comItens([
+    new Item('Produto A', 150),
+    new Item('Produto B', 50),
+  ])
+  .build();
+
+// um carrinho válido padrão fica:
+// new CarrinhoBuilder().build()</pre>
+  </div>
+</div>
+
+<h3>2.3 Como o Builder melhora legibilidade e manutenção</h3>
+<ul>
+  <li><strong>Intenção explícita:</strong> o teste mostra apenas o que é relevante para o cenário (usuário premium, total de R$ 200). O resto fica escondido nos <em>defaults</em>, combatendo diretamente o <em>test smell</em> de <strong>Setup Obscuro</strong>.</li>
+  <li><strong>API fluente:</strong> o encadeamento (cada método retorna <code>this</code>) lê-se quase como uma frase, e a ausência de chamadas (ex.: não chamar <code>.vazio()</code>) também comunica intenção.</li>
+  <li><strong>Manutenção centralizada:</strong> se o construtor do <code>Carrinho</code> mudar, corrige-se apenas o <code>build()</code> do builder — e não dezenas de testes que montavam o objeto manualmente.</li>
+  <li><strong>Menos ruído, menos erro:</strong> dados irrelevantes deixam de poluir cada teste, reduzindo a chance de copiar/colar um setup errado.</li>
+</ul>
+
+<!-- ===================== 3. TEST DOUBLES ===================== -->
+<h2>3. Padrões de Test Doubles (Mocks vs. Stubs)</h2>
+
+<p>
+Para a análise foi escolhido o teste de <strong>sucesso de um cliente Premium</strong> (Etapa 5), em <code>__tests__/CheckoutService.test.js</code>. Nesse cenário, um carrinho premium de R$ 200,00 deve receber 10% de desconto (cobrança de R$ 180,00), ser persistido e gerar um e-mail de confirmação.
+</p>
+
+<h3>3.1 Quem é Stub e quem é Mock</h3>
+<table>
+  <tr><th>Dependência</th><th>Tipo de Double</th><th>Papel no teste</th></tr>
+  <tr>
+    <td><code>GatewayPagamento</code></td>
+    <td><strong>Stub</strong></td>
+    <td>Devolve <code>{ success: true }</code> só para o fluxo prosseguir.</td>
+  </tr>
+  <tr>
+    <td><code>PedidoRepository</code></td>
+    <td><strong>Stub</strong></td>
+    <td>Devolve um pedido salvo (com <code>id</code>) para alimentar o passo seguinte.</td>
+  </tr>
+  <tr>
+    <td><code>EmailService</code></td>
+    <td><strong>Mock</strong></td>
+    <td>É o alvo da verificação: foi chamado? quantas vezes? com quais argumentos?</td>
+  </tr>
+</table>
+
+<pre>// Stubs — controlam o fluxo/retorno
+const gatewayStub = { cobrar: jest.fn().mockResolvedValue({ success: true }) };
+const repositoryStub = { salvar: jest.fn().mockImplementation(
+  async (p) =&gt; new Pedido(99, p.carrinho, p.totalFinal, p.status)) };
+
+// Mock — verificamos a interação
+const emailMock = { enviarEmail: jest.fn().mockResolvedValue(undefined) };
+
+// Assert de comportamento:
+expect(gatewayStub.cobrar).toHaveBeenCalledWith(180, '4111-1111-1111-1111');
+expect(emailMock.enviarEmail).toHaveBeenCalledTimes(1);
+expect(emailMock.enviarEmail).toHaveBeenCalledWith(
+  'premium@email.com', 'Seu Pedido foi Aprovado!', 'Pedido 99 no valor de R$180');</pre>
+
+<h3>3.2 Por que o Gateway é (principalmente) Stub e o Email é Mock</h3>
+<p>
+A distinção segue a ideia de <strong>Verificação de Estado × Verificação de Comportamento</strong> (Martin Fowler, <em>Mocks Aren't Stubs</em>). O <code>GatewayPagamento</code> entra como <strong>Stub</strong> porque o que nos interessa dele é o <strong>retorno</strong> que ele injeta no fluxo: dizer “o pagamento deu certo” permite que o restante do <code>processarPedido</code> aconteça. Ele é uma <strong>entrada indireta</strong> — controlamos o estado do sistema através dele.
+</p>
+<div class="callout">
+<strong>Observação (o “principalmente”):</strong> o <code>cobrar</code> também é verificado com <code>toHaveBeenCalledWith(180, ...)</code> para confirmar o desconto. Ou seja, ele atua majoritariamente como Stub (controla o fluxo), mas tem um toque de Mock nessa asserção pontual — o que é comum, já que <code>jest.fn()</code> registra as chamadas de qualquer forma.
+</div>
+<p>
+Já o <code>EmailService</code> é um <strong>Mock</strong> porque o envio do e-mail é um <strong>efeito colateral</strong> — uma <strong>saída indireta</strong> do sistema que não se reflete no valor de retorno do método. A única maneira de garantir que “o cliente foi notificado, com o destinatário, o assunto e o corpo corretos” é <strong>verificar a interação</strong> com o dublê. Por isso a asserção recai sobre <em>como</em> e <em>com o quê</em> ele foi chamado, e não sobre um estado retornado.
+</p>
+<p>
+No teste de <strong>falha de pagamento</strong> (Etapa 4), o mesmo raciocínio aparece de outra forma: o repositório e o e-mail entram como <strong>Dummies</strong> — não devem nem ser chamados —, e a asserção <code>expect(pedido).toBeNull()</code> é uma <strong>verificação de estado</strong> pura, controlada pelo Stub do gateway que retorna <code>{ success: false }</code>.
+</p>
+
+<h3>3.3 Qualidade dos testes (padrão AAA)</h3>
+<p>
+Ambos os testes seguem o padrão <strong>Arrange, Act, Assert</strong>, sinalizado por comentários, com um cenário por bloco <code>it</code>. A suíte cobre os três cenários propostos — <strong>falha</strong> de pagamento (retorno <code>null</code>), <strong>desconto</strong> de 10% (cobrança de R$ 180) e <strong>envio de e-mail</strong> (interação verificada). Rodando <code>npm test</code>, os dois testes passam.
+</p>
+
+<pre>PASS __tests__/CheckoutService.test.js
+  CheckoutService
+    quando o pagamento falha
+      ✓ deve retornar null (pedido não é criado)
+    quando um cliente Premium finaliza a compra
+      ✓ deve aplicar 10% de desconto e notificar o cliente por e-mail
+
+Tests: 2 passed, 2 total</pre>
+
+<!-- ===================== 4. CONCLUSÃO ===================== -->
+<h2>4. Conclusão</h2>
+
+<p>
+O uso deliberado de Padrões de Teste mudou a natureza da suíte: em vez de cada teste carregar um setup verboso e dependências reais, passamos a ter dados de teste <strong>declarativos</strong> (via <em>Object Mother</em> e <em>Data Builder</em>) e dependências <strong>controladas</strong> (via <em>Stubs</em> e <em>Mocks</em>). Isso ataca a raiz de <em>test smells</em> clássicos — o <strong>Setup Obscuro</strong> some quando o builder esconde o irrelevante, e os <strong>Testes Frágeis</strong> deixam de existir quando isolamos o SUT de serviços externos como gateways e e-mail.
+</p>
+<p>
+A escolha consciente entre Stub e Mock também torna cada teste mais honesto sobre o que está verificando: estado (o que o método devolve) ou comportamento (com quem o método interagiu). O resultado é uma suíte rápida, isolada, legível e sustentável — testes que de fato protegem a lógica de negócio e que envelhecem bem à medida que o sistema cresce, em vez de oferecer apenas uma falsa sensação de cobertura.
+</p>
+
+</body>
+</html>
